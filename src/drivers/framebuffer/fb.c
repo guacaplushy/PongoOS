@@ -25,7 +25,6 @@
  * 
  */
 #include <pongo.h>
-#include <stddef.h>
 #include "font8x8_basic.h"
 
 uint32_t* gFramebuffer;
@@ -214,7 +213,7 @@ struct logo_position {
     uint32_t begin_y;
 };
 // x and y values are native coordinates on display
-static void set_pixel(const struct logo_position *pos, const size_t x, const size_t y) {
+static void set_pixel(const struct logo_position *pos, const uint32_t x, const size_t y) {
     // gRowPixels: the amount of pixels in a row (width)
     uint32_t fb_index = ((pos->begin_y + y) * gRowPixels) + pos->begin_x + x;
     gFramebuffer[fb_index] ^= 0xFFFFFFFF;
@@ -223,7 +222,7 @@ static void set_pixel(const struct logo_position *pos, const size_t x, const siz
 // also: do you really trust my floating point comparisons? or is it just magic?
 //
 // remember: x and y positions in here are real native coordinates on display
-static void draw_logo(const struct logo_position *pos, const size_t size) {
+static void draw_logo(const struct logo_position *pos, const uint32_t size) {
     // top_radius/size = 8/128
     // This allows it to be scaled to any `size`,
     // while using position measurements based on pixels of 128x128 palera1n logo PNG
@@ -234,11 +233,11 @@ static void draw_logo(const struct logo_position *pos, const size_t size) {
     const double center_x = size / 2;
 
     // TOP CIRCLE
-    for (size_t y = 0; y < top_radius; y++) {
+    for (uint32_t y = 0; y < top_radius; y++) {
         // the y coordinate of centerpoint of circle
         // TODO: rename? this is local not global
         const double center_y = top_radius;
-        for (size_t x = 0; x < size; x++) {
+        for (uint32_t x = 0; x < size; x++) {
             // circle
             if (((x - center_x) * (x - center_x)) + ((y - center_y) * (y - center_y)) <= (top_radius * top_radius)) {
                 set_pixel(pos, x, y);
@@ -255,7 +254,7 @@ static void draw_logo(const struct logo_position *pos, const size_t size) {
     // difference in radii
     const double transition_radius_diff = radius_end - radius_start;
     // TODO: if size < 128, this might overwrite the same line multiple times, but who cares
-    for (size_t y = transition_begin_y; y < transition_end_y; y++) {
+    for (uint32_t y = transition_begin_y; y < transition_end_y; y++) {
         // the y value through the transition; remember that y is not starting at 0
         const double transition_pos = y - transition_begin_y;
         // how far through the transition we are
@@ -267,16 +266,16 @@ static void draw_logo(const struct logo_position *pos, const size_t size) {
 
         const double x_start = center_x - radius;
         const double x_end = center_x + radius;
-        for (size_t x = x_start + 1; x < x_end; x++) {
+        for (uint32_t x = x_start + 1; x < x_end; x++) {
             set_pixel(pos, x, y);
         }
     }
 
     // BOTTOM CIRCLE
-    for (size_t y = transition_end_y; y < size; y++) {
+    for (uint32_t y = transition_end_y; y < size; y++) {
         // TODO: rename? this is local not global
         const double center_y = size - bottom_radius - 1;
-        for (size_t x = 0; x < size; x++) {
+        for (uint32_t x = 0; x < size; x++) {
             if (((x - center_x) * (x - center_x)) + ((y - center_y) * (y - center_y)) <= (bottom_radius * bottom_radius)) {
                 set_pixel(pos, x, y);
             }
