@@ -216,7 +216,7 @@ struct logo_position {
 // x and y values are native coordinates on display
 static void set_pixel(const struct logo_position *pos, const size_t x, const size_t y) {
     // gRowPixels: the amount of pixels in a row (width)
-    uint32_t fb_index = ((begin_y + y) * gRowPixels) + begin_x + x;
+    uint32_t fb_index = ((pos->begin_y + y) * gRowPixels) + pos->begin_x + x;
     gFramebuffer[fb_index] ^= 0xFFFFFFFF;
 }
 // TODO: check for off-by-one errors
