@@ -25,6 +25,7 @@
  * 
  */
 #include <pongo.h>
+#include <stddef.h>
 #include "font8x8_basic.h"
 
 uint32_t* gFramebuffer;
@@ -208,8 +209,80 @@ void screen_invert(const char *cmd, char *args) {
     cache_clean(gFramebuffer, gHeight * gRowPixels * 4);
 }
 
-uint32_t gLogoBitmap[32] = { 0x0, 0xa00, 0x400, 0x5540, 0x7fc0, 0x3f80, 0x3f80, 0x1f00, 0x1f00, 0x1f00, 0x3f80, 0xffe0, 0x3f80, 0x3f80, 0x3f83, 0x103f9f, 0x18103ffb, 0xe3fffd5, 0x1beabfab, 0x480d7fd5, 0xf80abfab, 0x480d7fd5, 0x1beabfab, 0xe3fffd5, 0x18107ffb, 0x107fdf, 0x7fc3, 0xffe0, 0xffe0, 0xffe0, 0x1fff0, 0x1fff0 };
+struct logo_position {
+    uint32_t begin_x;
+    uint32_t begin_y;
+};
+// x and y values are native coordinates on display
+static void set_pixel(const struct logo_position *pos, const size_t x, const size_t y) {
+    // gRowPixels: the amount of pixels in a row (width)
+    uint32_t fb_index = ((begin_y + y) * gRowPixels) + begin_x + x;
+    gFramebuffer[fb_index] ^= 0xFFFFFFFF;
+}
+// TODO: check for off-by-one errors
+// also: do you really trust my floating point comparisons? or is it just magic?
+//
+// remember: x and y positions in here are real native coordinates on display
+static void draw_logo(const struct logo_position *pos, const size_t size) {
+    // top_radius/size = 8/128
+    // This allows it to be scaled to any `size`,
+    // while using position measurements based on pixels of 128x128 palera1n logo PNG
+    const double top_radius = (size * 8 / 128);
+    const double bottom_radius = (size * 36 / 128);
 
+    // global center x TODO: rename?
+    const double center_x = size / 2;
+
+    // TOP CIRCLE
+    for (size_t y = 0; y < top_radius; y++) {
+        // the y coordinate of centerpoint of circle
+        // TODO: rename? this is local not global
+        const double center_y = top_radius;
+        for (size_t x = 0; x < size; x++) {
+            // circle
+            if (((x - center_x) * (x - center_x)) + ((y - center_y) * (y - center_y)) <= (top_radius * top_radius)) {
+                set_pixel(pos, x, y);
+            }
+        }
+    }
+
+    // TRANSITION
+    const double radius_start = top_radius;
+    const double radius_end = bottom_radius;
+
+    const double transition_begin_y = top_radius;
+    const double transition_end_y = size - bottom_radius;
+    // difference in radii
+    const double transition_radius_diff = radius_end - radius_start;
+    // TODO: if size < 128, this might overwrite the same line multiple times, but who cares
+    for (size_t y = transition_begin_y; y < transition_end_y; y++) {
+        // the y value through the transition; remember that y is not starting at 0
+        const double transition_pos = y - transition_begin_y;
+        // how far through the transition we are
+        const double transition_factor = transition_pos / (transition_end_y - transition_begin_y);
+        //mvprintw(y, 0, "%f", transition_length);
+        //continue;
+        // could be const but that's confusing if you read it in English
+        const double radius = radius_start + (transition_factor * transition_radius_diff);
+
+        const double x_start = center_x - radius;
+        const double x_end = center_x + radius;
+        for (size_t x = x_start + 1; x < x_end; x++) {
+            set_pixel(pos, x, y);
+        }
+    }
+
+    // BOTTOM CIRCLE
+    for (size_t y = transition_end_y; y < size; y++) {
+        // TODO: rename? this is local not global
+        const double center_y = size - bottom_radius - 1;
+        for (size_t x = 0; x < size; x++) {
+            if (((x - center_x) * (x - center_x)) + ((y - center_y) * (y - center_y)) <= (bottom_radius * bottom_radius)) {
+                set_pixel(pos, x, y);
+            }
+        }
+    }
+}
 void screen_init() {
     gRowPixels = gBootArgs->Video.v_rowBytes >> 2;
     uint16_t width = gWidth = gBootArgs->Video.v_width;
@@ -241,20 +314,12 @@ void screen_init() {
     uint32_t logo_scaler_factor = 2 * scale_factor;
     if (socnum == 0x8012) logo_scaler_factor = 1;
 
-    uint32_t logo_x_begin = (gRowPixels / 2) - (16 * logo_scaler_factor);
-    uint32_t logo_y_begin = (height / 2) - (16 * logo_scaler_factor);
+    struct logo_position log_pos = {
+        .begin_x = (gRowPixels / 2) - (16 * logo_scaler_factor),
+        .begin_y = (height / 2) - (16 * logo_scaler_factor),
+    };
 
-    for (uint32_t y = 0; y < (32 * logo_scaler_factor); ++y) {
-        uint32_t b = gLogoBitmap[y / logo_scaler_factor];
-        for (uint32_t x = 0; x < (32 * logo_scaler_factor); ++x) {
-            uint32_t ind = logo_x_begin + x + ((logo_y_begin + y) * gRowPixels);
-            uint32_t curcolor = gFramebuffer[ind];
-            if (b & (1 << (x / logo_scaler_factor))) {
-                curcolor ^= 0xFFFFFFFF;
-            }
-            gFramebuffer[ind] = curcolor;
-        }
-    }
+    draw_logo(&log_pos, 32 * logo_scaler_factor);
     
     memcpy(gFramebufferCopy, gFramebuffer, fbsize);
 
