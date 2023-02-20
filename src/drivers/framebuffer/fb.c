@@ -266,7 +266,7 @@ static void draw_logo(const struct logo_position *pos, const uint32_t size) {
 
         const double x_start = center_x - radius;
         const double x_end = center_x + radius;
-        for (uint32_t x = x_start + 1; x < x_end; x++) {
+        for (uint32_t x = x_start + 1; x < x_end; x++) { // TODO: why does this need to be + 1, probably because < instead of <=? since otherwise off by one on left side only
             set_pixel(pos, x, y);
         }
     }
@@ -274,7 +274,7 @@ static void draw_logo(const struct logo_position *pos, const uint32_t size) {
     // BOTTOM CIRCLE
     for (uint32_t y = transition_end_y; y < size; y++) {
         // TODO: rename? this is local not global
-        const double center_y = size - bottom_radius - 1;
+        const double center_y = size - bottom_radius;
         for (uint32_t x = 0; x < size; x++) {
             if (((x - center_x) * (x - center_x)) + ((y - center_y) * (y - center_y)) <= (bottom_radius * bottom_radius)) {
                 set_pixel(pos, x, y);
