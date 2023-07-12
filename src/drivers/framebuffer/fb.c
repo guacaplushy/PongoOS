@@ -231,8 +231,18 @@ void fbinfo() {
     printf("fbsize      : %016llx\n", (gBootArgs->Video.v_height) * (gBootArgs->Video.v_rowBytes >> 2) * 4);
 }
 
+// blue #5BCEFA
+// pink #F5A9B8
+// white #FFFFFF
+
+uint32_t nextColorStrip[5] = { 0x5bcdfa, 0xf5a9b8, 0xccd0da, 0xf5a9b8, 0x5bcefa };
+uint32_t nextColorPixel = -72;
 uint32_t nextColor(uint32_t color)
 {
+    uint32_t strip = (nextColorPixel++) / 164;
+    return nextColorStrip[strip % 5];
+
+    return 0xaaffff;
     uint8_t r = (color >> 16) & 0xff;
     uint8_t g = (color >>  8) & 0xff;
     uint8_t b = (color      ) & 0xff;
