@@ -233,13 +233,13 @@ void fbinfo() {
 
 // blue #5BCEFA
 // pink #F5A9B8
-// white #FFFFFF
+// white #CCD0DA
 
 uint32_t nextColorStrip[5] = { 0x5bcdfa, 0xf5a9b8, 0xccd0da, 0xf5a9b8, 0x5bcefa };
 uint32_t nextColorPixel = -72;
 uint32_t nextColor(uint32_t color)
 {
-    uint32_t strip = (nextColorPixel++) / 164;
+    uint32_t strip = (nextColorPixel++) / (55 * scale_factor);
     return nextColorStrip[strip % 5];
 
     return 0xaaffff;
@@ -298,6 +298,8 @@ void screen_init() {
 
     if (width > height) scale_factor = 1;
 
+    nextColorPixel = -24 * scale_factor;
+
     uint32_t logo_scaler_factor = 2 * scale_factor;
     if (socnum == 0x8012) logo_scaler_factor = 1;
 
@@ -322,7 +324,6 @@ void screen_init() {
         for(int i=0; i<(32 / logo_scaler_factor); i++)
             color = nextColor(color);
     }
-    
     memcpy(gFramebufferCopy, gFramebuffer, fbsize);
 
     basecolor = gFramebuffer[0];
