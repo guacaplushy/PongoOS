@@ -932,6 +932,7 @@ bool kpf_apfs_patches_mount(struct xnu_pf_patch* patch, uint32_t* opcode_stream)
         return false;
     }
     puts("KPF: Found APFS mount");
+    DEVLOG("f_apfs_privcheck at 0x%llx", kext_rebase_va(xnu_ptr_to_va(f_apfs_privcheck)));
     *f_apfs_privcheck = 0xeb00001f; // cmp x0, x0
     return true;
 }
@@ -1126,17 +1127,16 @@ void kpf_apfs_patches(xnu_pf_patchset_t* patchset, bool have_union) {
     // r2 cmd:
     // /x 0000403908011b3200000039000000b9:0000c0bfffffffff0000c0bf000000ff
     uint64_t matches[] = {
-        0x39400000, // ldr{b|h} w*, [x*]
-        0x321b0108, // orr w8, w8, 0x20
+        0x321B0008, // orr w8, wX, 0x20
         0x39000000, // str{b|h} w*, [x*]
-        0xb9000000  // str w*, [x*]
+        0xb9000000, // ldr {w|x}*, [x*]
     };
     uint64_t masks[] = {
+        0xfffffc1f,
         0xbfc00000,
-        0xffffffff,
-        0xbfc00000,
-        0xff000000,
+        0xbf000000,
     };
+    
     xnu_pf_maskmatch(patchset, "apfs_patch_mount", matches, masks, sizeof(matches)/sizeof(uint64_t), true, (void*)kpf_apfs_patches_mount);
     if(have_union)
     {
