@@ -1111,8 +1111,7 @@ void kpf_apfs_patches(xnu_pf_patchset_t* patchset, bool have_union) {
     // there is a check in the apfs mount function that makes sure that the kernel task is calling this function (current_task() == kernel_task)
     // we also want to call it so we patch that check out
     // example from i7 13.3:
-    // 0xfffffff00692e67c      e8034139       ldrb w8, [sp, 0x40] ; [0x40:4]=392 <- we patchfind this
-    // 0xfffffff00692e680      08011b32       orr w8, w8, 0x20
+    // 0xfffffff00692e680      08011b32       orr w8, w8, 0x20            <- we patchfind this
     // 0xfffffff00692e684      e8030139       strb w8, [sp, 0x40]
     // 0xfffffff00692e688      e83b40b9       ldr w8, [sp, 0x38]  ; [0x38:4]=0
     // 0xfffffff00692e68c      e85301b9       str w8, [sp, 0x150]
@@ -1125,9 +1124,9 @@ void kpf_apfs_patches(xnu_pf_patchset_t* patchset, bool have_union) {
     // 0xfffffff00692e6a8      080140f9       ldr x8, [x8]
     // 0xfffffff00692e6ac      1f0008eb       cmp x0, x8 <- cmp (patches to cmp x0, x0)
     // r2 cmd:
-    // /x 0000403908011b3200000039000000b9:0000c0bfffffffff0000c0bf000000ff
+    // /x 08001b3200000039000000b9:1ffcffff0000c0bf000000bf
     uint64_t matches[] = {
-        0x321B0008, // orr w8, wX, 0x20
+        0x321b0008, // orr w8, wX, 0x20
         0x39000000, // str{b|h} w*, [x*]
         0xb9000000, // ldr {w|x}*, [x*]
     };
