@@ -41,6 +41,10 @@ palerain_option_t palera1n_flags;
 
 #if __STDC_HOSTED__
 extern bool test_force_rootful;
+
+#if __has_include(<bsd/string.h>)
+#include <bsd/string.h>
+#endif
 #endif
 
 #if 0
@@ -1830,17 +1834,41 @@ static void kpf_cmd(const char *cmd, char *args)
 
     const char rootvp_string[] = "rootvp not authenticated after mounting";
     const char *rootvp_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, rootvp_string, sizeof(rootvp_string) - 1);
-#if 0
+#ifdef DEV_BUILD
     const char livefs_string[] = "Rooting from the live fs of a sealed volume is not allowed on a RELEASE build";
     const char *livefs_string_match = apfs_text_cstring_range ? memmem(apfs_text_cstring_range->cacheable_base, apfs_text_cstring_range->size, livefs_string, sizeof(livefs_string) - 1) : NULL;
     if(!livefs_string_match) livefs_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, livefs_string, sizeof(livefs_string) - 1);
 #endif
 
 #ifdef DEV_BUILD
-#if 0
     // 15.0 beta 1 onwards, but only iOS/iPadOS
     if((livefs_string_match != NULL) != (gKernelVersion.darwinMajor >= 21 && xnu_platform() == PLATFORM_IOS)) panic("livefs panic doesn't match expected Darwin version");
 #endif
+
+    if (!rootvp_string_match) {
+        strlcat((char*)((int64_t)gBootArgs->iOS13.CommandLine - 0x800000000 + kCacheableView), " rootdev=md0", 0x270);
+    }
+
+    xnu_pf_range_t* bootdata_range = xnu_pf_section(hdr, "__BOOTDATA", "__init");
+
+    if (bootdata_range) {
+        const char thid_should_crash_string[] = "thid_should_crash";
+        const char *thid_should_crash_string_match = memmem(bootdata_range->cacheable_base, bootdata_range->size, thid_should_crash_string, sizeof(thid_should_crash_string) - 1);
+
+#ifdef DEV_BUILD
+        // 17.0 beta 1 onwards
+        if((thid_should_crash_string_match != NULL) != (gKernelVersion.darwinMajor >= 23)) panic("thid_should_crash string doesn't match expected Darwin version");
+#endif
+
+        if (thid_should_crash_string_match && !strstr((char*)((int64_t)gBootArgs->iOS13.CommandLine - 0x800000000 + kCacheableView), "thid_should_crash="))
+        {
+            strlcat((char*)((int64_t)gBootArgs->iOS13.CommandLine - 0x800000000 + kCacheableView), " thid_should_crash=0", 0x270);
+        }
+    }
+#ifdef DEV_BUILD
+    else if (gKernelVersion.darwinMajor > 19) {
+        panic("__BOOTDATA __init existence does not match expected Darwin version");
+    }
 #endif
 
     for(size_t i = 0; i < sizeof(kpf_components)/sizeof(kpf_components[0]); ++i)
