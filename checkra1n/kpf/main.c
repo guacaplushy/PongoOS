@@ -1830,11 +1830,11 @@ static void kpf_cmd(const char *cmd, char *args)
     xnu_pf_patchset_t* apfs_patchset = xnu_pf_patchset_create(XNU_PF_ACCESS_32BIT);
     struct mach_header_64* apfs_header = xnu_pf_get_kext_header(hdr, "com.apple.filesystems.apfs");
     xnu_pf_range_t* apfs_text_exec_range = xnu_pf_section(apfs_header, "__TEXT_EXEC", "__text");
-    //xnu_pf_range_t* apfs_text_cstring_range = xnu_pf_section(apfs_header, "__TEXT", "__cstring");
 
     const char rootvp_string[] = "rootvp not authenticated after mounting";
     const char *rootvp_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, rootvp_string, sizeof(rootvp_string) - 1);
 #ifdef DEV_BUILD
+    xnu_pf_range_t* apfs_text_cstring_range = xnu_pf_section(apfs_header, "__TEXT", "__cstring");
     const char livefs_string[] = "Rooting from the live fs of a sealed volume is not allowed on a RELEASE build";
     const char *livefs_string_match = apfs_text_cstring_range ? memmem(apfs_text_cstring_range->cacheable_base, apfs_text_cstring_range->size, livefs_string, sizeof(livefs_string) - 1) : NULL;
     if(!livefs_string_match) livefs_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, livefs_string, sizeof(livefs_string) - 1);
@@ -1850,11 +1850,11 @@ static void kpf_cmd(const char *cmd, char *args)
     }
 
     xnu_pf_range_t* bootdata_range = xnu_pf_section(hdr, "__BOOTDATA", "__init");
+#ifdef DEV_BUILD
     xnu_pf_range_t* const_klddata_range = xnu_pf_section(hdr, "__KLDDATA", "__const");
 
-#ifdef DEV_BUILD
-    if (gKernelVersion.darwinMajor >= 20 != (const_klddata_range != NULL)) {
-        panic("__KLDDATA __const existence does not match expected Darwin version");
+    if (gKernelVersion.xnuMajor >= 7195 != (const_klddata_range != NULL)) {
+        if (gKernelVersion.xnuMajor == 7195 && gKernelVersion.darwinMinor > 4) panic("__KLDDATA __const existence does not match expected Darwin version");
     }
 #endif
 
@@ -1866,15 +1866,15 @@ static void kpf_cmd(const char *cmd, char *args)
 #ifdef DEV_BUILD
         // 17.0 beta 1 - 17.3
         if((thid_should_crash_string_match != NULL) != gKernelVersion.xnuMajor >= 10002 && gKernelVersion.xnuMajor < 10063) panic("thid_should_crash string doesn't match expected Darwin version");
-#endif
 
-        if (!thid_should_crash_string_match && const_klddata_range) {
+
+        if (const_klddata_range) {
             thid_should_crash_string_match = memmem(const_klddata_range->cacheable_base, const_klddata_range->size, thid_should_crash_string, sizeof(thid_should_crash_string) - 1);
         }
 
         // 17.4 beta 1 onwards
-        if((thid_should_crash_string_match != NULL) != gKernelVersion.xnuMajor >= 10063) panic("thid_should_crash string doesn't match expected Darwin version");
-
+        if(const_klddata_range && ((thid_should_crash_string_match != NULL) != gKernelVersion.xnuMajor >= 10063)) panic("thid_should_crash string doesn't match expected Darwin version");
+#endif
         if (thid_should_crash_string_match && !strstr((char*)((int64_t)gBootArgs->iOS13.CommandLine - 0x800000000 + kCacheableView), "thid_should_crash="))
         {
             strlcat((char*)((int64_t)gBootArgs->iOS13.CommandLine - 0x800000000 + kCacheableView), " thid_should_crash=0", 0x270);
