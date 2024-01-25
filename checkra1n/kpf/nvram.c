@@ -245,26 +245,26 @@ static void kpf_nvram_patches(xnu_pf_patchset_t *xnu_text_exec_patchset)
     uint64_t matches4[] =
     {
         0x90000010, // adrp xN, 0x...
-        0x91000210, // add xN, xN, 0x438
+        0x91000000, // add xN, xN, 0x...
         0x90000000, // adrp x0, 0x...
-        0x91000000, // add x0, x0, 0x32b
+        0x91000000, // add x0, x0, 0x...
         0xaa1003e1, // mov x1, x{16-31}
         0x94000000, // bl sym._strcmp
         0x34000060, // cbz w0, .+12
-        0xf8410e00, // ldr x0, [xN, 0x10]!
+        0xf8400c00, // ldr x0, [xN, ...]!
         0xb5ffff80, // cbnz x0, .-16
         0xf9400610, // ldr x{16-31}, [xN, 8]
     };
     uint64_t masks4[] =
     {
         0x9f000010,
-        0xffc00210,
+        0xffc00000,
         0x9f00001f,
-        0xffc003ff,
+        0xffc00000,
         0xfff0ffff,
         0xfc000000,
         0xffffffff,
-        0xfffffe1f,
+        0xffe00c1f,
         0xffffffff,
         0xfffffe10,
     };
