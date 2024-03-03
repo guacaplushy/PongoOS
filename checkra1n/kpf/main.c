@@ -2014,6 +2014,71 @@ void kpf_md0oncores_patch(xnu_pf_patchset_t* patchset)
     xnu_pf_maskmatch(patchset, "copyout_callsites", copyout_matches, copyout_masks, sizeof(copyout_matches)/sizeof(uint64_t), true, (void*)copyout_callsites_callback);
 }
 
+bool found_static_binaries = false;
+bool static_binaries_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream) {
+    if (found_static_binaries) {
+        panic("KPF: parse_machfile: Found twice!");
+    }
+    uint32_t* bne = find_next_insn(opcode_stream+4, 3, 0x54000001, 0xff00001f);
+    if (!bne) return false;
+    *bne = NOP;
+    puts("KPF: Found static binaries");
+    found_static_binaries = true;
+    return true;
+}
+
+/* XXX: Doesn't work like this, very complicated to have it work correctly */
+#if 0
+bool static_binaries_old_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream) {
+    uint32_t tbz_offset = (opcode_stream[1] >> 5) & 0x3fff;
+    uint32_t *tbz_stream = opcode_stream + 1 + tbz_offset;
+    if (
+        (tbz_stream[0] & 0xfffffff0) != 0x321e03f0 ||
+        (tbz_stream[1] & 0xfc000000 != 0x14000000)
+    ) return false;
+
+    tbz_stream[0] = NOP;
+    tbz_stream[1] = NOP;
+}
+#endif
+
+void kpf_static_binaries_patch(xnu_pf_patchset_t* patchset) {
+    // we match the part where it allows x86_64 static binaries
+    uint64_t matches[] = {
+        0x37100008, // tbnz w8, #0x2, ...
+        0x528000e8, // mov w8, #0x7
+        0x72a02008, // mov w8, 0x100, lsl 16
+        0x6b08001f, // cmp wN, w8
+    };
+
+    uint64_t masks[] = {
+        0xfff8001f,
+        0xffffffff,
+        0xfffffe1f,
+        0xfffffc1f
+    };
+
+    xnu_pf_maskmatch(patchset, "parse_machfile", matches, masks, sizeof(matches)/sizeof(uint64_t), false, (void*)static_binaries_callback);
+
+#if 0
+    uint64_t matches_old[] = {
+        0x36100008,
+        0x37a80008,
+        0x52800188,
+        0x72a00008
+    };
+
+    uint64_t masks_old[] = {
+        0xfff8001f,
+        0xfff8001f,
+        0xffffffff,
+        0xffe0001f
+    };
+    xnu_pf_maskmatch(patchset, "parse_machfile", matches_old, masks_old, sizeof(matches_old)/sizeof(uint64_t), false, (void*)static_binaries_old_callback);
+#endif
+
+}
+
 static uint32_t shellcode_count;
 static uint32_t *shellcode_area;
 
@@ -2401,6 +2466,7 @@ static void kpf_cmd(const char *cmd, char *args)
         kpf_md0oncores_patch(xnu_text_exec_patchset);
         kpf_vnop_rootvp_auth_patch(xnu_text_exec_patchset);
     }
+    kpf_static_binaries_patch(xnu_text_exec_patchset);
 
     xnu_pf_emit(xnu_text_exec_patchset);
     xnu_pf_apply(text_exec_range, xnu_text_exec_patchset);
@@ -2431,6 +2497,9 @@ static void kpf_cmd(const char *cmd, char *args)
       } else {
         puts("Missing patch: apfs_vfsop_mount");
       }
+    }
+    if (!found_static_binaries && rootvp_string_match != NULL) {
+        panic("Missing patch: parse_machfile");
     }
 
     uint32_t delta = (&shellcode_area[1]) - amfi_ret;
