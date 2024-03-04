@@ -2059,7 +2059,7 @@ bool static_binaries_old_callback(struct xnu_pf_patch* patch, uint32_t* opcode_s
     } else if ((opcode_stream[0] & 0xffffffe0) == 0x52800080) { // mov
         uint32_t* load_failure = &opcode_stream[3] + sxt32(opcode_stream[3] >> 5, 19);
         uint8_t wM = (opcode_stream[2] >> 16) & 0x1f;
-        // Allow (header->flags & MH_DYLINKER) == 0
+        // Allow (header->flags & MH_DYLDLINK) == 0
         opcode_stream[2] = 0x36100000 | ((common_stream - &opcode_stream[2]) & 0x3fff) << 5 | wM; /* tbz wM, #0x2, common_stream */
         // Disallow (header->flags & MH_PIE) == 0 in dynamic executables
         opcode_stream[3] = 0x36a80000 | ((load_failure - &opcode_stream[3]) & 0x3fff) << 5 | wM;  /* tbz wM, #0x15, load_failure */
