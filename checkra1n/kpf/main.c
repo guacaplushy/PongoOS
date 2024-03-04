@@ -2049,8 +2049,7 @@ bool static_binaries_old_callback(struct xnu_pf_patch* patch, uint32_t* opcode_s
     DEVLOG("parse_machfile: Found depth==2 check");
 
     // Step 3: We skip over the dylinker-specific code path and find the call to common code
-    uint32_t* cbz = find_next_insn(&dylinker_stream[3], 3, 0xb4000000, 0xff000000); // cbz
-    uint32_t* common_stream = cbz + 1;
+    uint32_t* common_stream = find_next_insn(&dylinker_stream[3], 3, 0xb4000000, 0xff000000); // cbz
 
     // Step 4: Actually patch the check for static binary to point to the common code
     if ((opcode_stream[0] & 0xfff80010) == 0x36100000) { // tbz
