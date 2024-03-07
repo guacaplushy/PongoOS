@@ -124,6 +124,7 @@ extern kpf_component_t kpf_trustcache;
 extern kpf_component_t kpf_vfs;
 extern kpf_component_t kpf_vm_prot;
 extern kpf_component_t kpf_proc_selfname;
+extern kpf_component_t kpf_set_exception_behavior_allowed;
 
 /********** ********** ********** ********** ********** Exports ********** ********** ********** ********** **********/
 

@@ -2203,7 +2203,8 @@ kpf_component_t* const kpf_components[] = {
     &kpf_trustcache,
     &kpf_vfs,
     &kpf_vm_prot,
-    &kpf_proc_selfname
+    &kpf_proc_selfname,
+    &kpf_set_exception_behavior_allowed
 };
 
 static void kpf_cmd(const char *cmd, char *args)
