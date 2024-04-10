@@ -2539,7 +2539,10 @@ static void kpf_cmd(const char *cmd, char *args)
       }
     }
 
-    uint32_t delta = (&shellcode_area[1]) - amfi_ret;
+    uint64_t shc_amfi_addr  = xnu_ptr_to_va(&shellcode_area[1]);
+    uint64_t amfi_ret_addr = xnu_ptr_to_va(amfi_ret);
+    int64_t offset = shc_amfi_addr - amfi_ret_addr;
+    uint32_t delta = offset >> 2;
     delta &= 0x03ffffff;
     delta |= 0x14000000;
     *amfi_ret = delta;
