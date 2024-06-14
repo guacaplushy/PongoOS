@@ -100,15 +100,16 @@ static inline int64_t adrp_off(uint32_t adrp)
     return sxt64((((((uint64_t)adrp >> 5) & 0x7ffffULL) << 2) | (((uint64_t)adrp >> 29) & 0x3ULL)) << 12, 33);
 }
 
-#ifdef DEV_BUILD
+
 extern struct kernel_version
 {
     uint32_t darwinMajor;
     uint32_t darwinMinor;
     uint32_t darwinRevision;
+    const char* kernel_version_string;
     uint32_t xnuMajor;
 } gKernelVersion;
-#endif
+
 
 /********** ********** ********** ********** ********** Components ********** ********** ********** ********** **********/
 
@@ -119,11 +120,12 @@ extern kpf_component_t kpf_launch_constraints;
 extern kpf_component_t kpf_mach_port;
 extern kpf_component_t kpf_nvram;
 extern kpf_component_t kpf_overlay;
+extern kpf_component_t kpf_proc_selfname;
 extern kpf_component_t kpf_ramdisk;
+extern kpf_component_t kpf_spawn_validate_persona;
 extern kpf_component_t kpf_trustcache;
 extern kpf_component_t kpf_vfs;
 extern kpf_component_t kpf_vm_prot;
-extern kpf_component_t kpf_proc_selfname;
 
 /********** ********** ********** ********** ********** Exports ********** ********** ********** ********** **********/
 

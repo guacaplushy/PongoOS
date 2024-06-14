@@ -135,7 +135,7 @@ uint32_t* follow_call(uint32_t *from)
     return target;
 }
 
-#ifdef DEV_BUILD
+
 struct kernel_version gKernelVersion;
 static void kpf_kernel_version_init(xnu_pf_range_t *text_const_range)
 {
@@ -147,6 +147,7 @@ static void kpf_kernel_version_init(xnu_pf_range_t *text_const_range)
         kernelVersionString = memmem(text_const_range->cacheable_base, text_const_range->size, kernelVersionStringMarker, strlen(kernelVersionStringMarker));
         if(kernelVersionString == NULL) panic("No kernel version string found");
     }
+    gKernelVersion.kernel_version_string = kernelVersionString;
     const char *start = kernelVersionString + strlen(kernelVersionStringMarker);
     char *end = NULL;
     errno = 0;
@@ -165,7 +166,7 @@ static void kpf_kernel_version_init(xnu_pf_range_t *text_const_range)
     if(errno) panic("Error parsing kernel version");
     printf("Detected Kernel version Darwin: %d.%d.%d xnu: %d\n", gKernelVersion.darwinMajor, gKernelVersion.darwinMinor, gKernelVersion.darwinRevision, gKernelVersion.xnuMajor);
 }
-#endif
+
 
 // Imports from shellcode.S
 extern uint32_t sandbox_shellcode[], sandbox_shellcode_setuid_patch[], sandbox_shellcode_ptrs[], sandbox_shellcode_end[];
@@ -1738,13 +1739,14 @@ kpf_component_t* const kpf_components[] = {
     &kpf_launch_constraints,
     &kpf_mach_port,
     &kpf_nvram,
+    &kpf_proc_selfname,
     &kpf_shellcode,
+    &kpf_spawn_validate_persona,
     &kpf_overlay,
     &kpf_ramdisk,
     &kpf_trustcache,
     &kpf_vfs,
     &kpf_vm_prot,
-    &kpf_proc_selfname
 };
 
 static void kpf_cmd(const char *cmd, char *args)
