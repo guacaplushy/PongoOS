@@ -798,6 +798,63 @@ bool vnode_lookup_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream)
     return true;
 }
 
+extern uint32_t one_area[];
+uint64_t* repatch_one_area_ptr;
+
+bool kpf_autobox_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream)
+{
+    void* proc_syscall_filter_mask_size = (void*)((const char *)(((uint64_t)(opcode_stream) & ~0xfffULL) 
+        + adrp_off(opcode_stream[0]) + ((opcode_stream[1] >> 10) & 0xfff)));
+
+    uint32_t* b = find_next_insn(opcode_stream, 0x10, 0x14000000, 0xfc000000); // b proc_set_syscall_filter_mask
+    if (!b) {
+        panic_at(opcode_stream, "kpf_autobox: Failed to find b proc_set_syscall_filter_mask");
+    }
+
+    uint32_t* proc_set_syscall_filter_mask = follow_call(b);
+    uint32_t *stackframe = find_prev_insn(opcode_stream - 1, 0x20, 0xa9007bfd, 0xffc07fff); // stp x29, x30, [sp, ...]
+    if(!stackframe)
+    {
+        panic_at(opcode_stream, "kpf_autobox: Failed to find stack frame");
+    }
+
+    uint32_t *start = find_prev_insn(stackframe - 1, 8, 0xd10003ff, 0xffc003ff); // sub sp, sp, ...
+    if(!start)
+    {
+        panic_at(stackframe, "kpf_autobox: Failed to find start of function");
+    }
+
+    /* Function logic
+     * int proc_set_syscall_filter_mask_shorthand(proc_t p, int which, void* maskptr, size_t masksize) {
+     *    return repatch_proc_set_syscall_filter_mask(
+     *          p, which, repatch_one_area_ptr,
+     *          *repatch_proc_set_syscall_filter_size[which]
+     *    );
+     * }
+    */
+    start[0] = 0x10000148; // adr x8, _proc_set_syscall_filter_mask
+    start[1] = 0x10000169; // adr x9, _proc_syscall_filter_mask_size
+    start[2] = 0x10000182; // adr x2, _one_area_ptr
+    start[3] = 0xf9400108; // ldr x8, [x8]
+    start[4] = 0xf9400129; // ldr x9, [x9]
+    start[5] = 0xf9400042; // ldr x2, [x2]
+    start[6] = 0xf861d923; // ldr x3, [x9, w1, sxtw #3]
+    start[7] = 0xb9400063; // ldr w3, [x3]
+    start[8] = 0xd61f0100; // br x8
+    start[9] = 0xd503201f; // nop
+
+    uint64_t* repatch_proc_set_syscall_filter_mask = (uint64_t*)&start[10];
+    uint64_t* repatch_proc_set_syscall_filter_size = (repatch_proc_set_syscall_filter_mask + 1);
+    repatch_one_area_ptr = (repatch_proc_set_syscall_filter_mask + 2);
+
+    *repatch_proc_set_syscall_filter_mask = xnu_ptr_to_va(proc_set_syscall_filter_mask);
+    *repatch_proc_set_syscall_filter_size = xnu_ptr_to_va(proc_syscall_filter_mask_size);
+    *repatch_one_area_ptr = 0x4141414141414141;
+
+    printf("KPF: found autobox\n");
+    return true;
+}
+
 bool kpf_protobox_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream)
 {
     uint32_t adrp1 = opcode_stream[0],
@@ -817,6 +874,12 @@ bool kpf_protobox_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream)
     }
 
     return false;
+}
+
+bool kpf_filter_mismatch_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream) {
+    opcode_stream[0] = 0x14000000 | sxt32(opcode_stream[0] >> 5, 19); // cbz -> b
+    printf("KPF: found syscall filter mismatch\n");
+    return true;
 }
 
 void kpf_find_shellcode_funcs(xnu_pf_patchset_t* xnu_text_exec_patchset) {
@@ -1716,7 +1779,7 @@ void kpf_amfi_kext_patches(xnu_pf_patchset_t* patchset) {
     xnu_pf_maskmatch(patchset, "amfi_mac_syscall_low", iiii_matches, iiii_masks, sizeof(iiii_matches)/sizeof(uint64_t), false, (void*)kpf_amfi_mac_syscall_low);
 }
 
-void kpf_sandbox_kext_patches(xnu_pf_patchset_t* patchset, bool protobox_used) {
+void kpf_sandbox_kext_patches(xnu_pf_patchset_t* patchset, bool protobox_used, bool has_autobox) {
     uint64_t matches[] = {
         0x35000000, // CBNZ
         0x94000000, // BL _vfs_context_current
@@ -1741,11 +1804,84 @@ void kpf_sandbox_kext_patches(xnu_pf_patchset_t* patchset, bool protobox_used) {
     };
     xnu_pf_maskmatch(patchset, "vnode_lookup", matches, masks, sizeof(masks)/sizeof(uint64_t), true, (void*)vnode_lookup_callback);
 
-    // Protobox on is an additional sandbox mechanism in iOS 16+ that introduces syscall masks, which is used to have syscall whitelists on some system processes
-    // When injecting into them or using something like Frida, it can prevent certain functionality
-    // Additionally it makes these processes crash on sandbox violations, meaning that calling even something simple like mach_thread_self in watchdogd will crash the process
-    // We disable it by making the code that enables it think the device is in Restore mode, as this check involves calling is_release_type with a string it's easy to find
+    if (has_autobox) {
+        uint64_t autobox_matches[] = {
+            0x90000008, // adrp x8, ...
+            0x91000108, // add, x8, x8
+            0xf860c808, // ldr x8, ...
+            0xb9400103, // ldr w3, [x8]
+            0xaa0003e0, // mov x0, x{16-31}
+            0xaa0003e1, // mov x1, x{16-31}
+            0xaa0003e2  // mov x2, x{16-31}
+        };
+
+        uint64_t autobox_masks[] = {
+            0x9f00001f,
+            0xffc003ff,
+            0xffe0ec1f,
+            0xffffffff,
+            0xffe0ffff,
+            0xffe0ffff,
+            0xffe0ffff
+        };
+
+        xnu_pf_maskmatch(patchset, "autobox", autobox_matches, autobox_masks, sizeof(autobox_masks) / sizeof(uint64_t), true, (void *)kpf_autobox_callback);
+
+        // syscall mask mismatch: %s\" @%s:%
+        uint64_t mismatch_matches[] = {
+            0xb4000000, // cbz
+            0xf9400000, // ldr
+            0xaa0003e0, // mov x0, ...
+            0x52800001, // mov w1, #0x0
+            0x94000000, // bl proc_get_syscall_filter_mask
+            0xeb00001f, // cmp x0, ...
+            0x54000001, // b.ne Lmismatch_panic
+            0xf9400000, // ldr
+            0xaa0003e0, // mov x0, ...
+            0x52800021, // mov w1, #0x0
+            0x94000000, // bl proc_get_syscall_filter_mask
+            0xeb00001f, // cmp x0, ...
+            0x54000001, // b.ne Lmismatch_panic
+            0xf9400000, // ldr
+            0xaa0003e0, // mov x0, ...
+            0x52800041, // mov w1, #0x0
+            0x94000000, // bl proc_get_syscall_filter_mask
+            0xeb00001f, // cmp x0, ...
+            0x54000001  // b.ne Lmismatch_panic
+        };
+
+        uint64_t mismatch_masks[] = {
+            0xff000000,
+            0xffc00000,
+            0xffe0ffff,
+            0xffffffff,
+            0xfc000000,
+            0xffe0ffff,
+            0xff00001f,
+            0xffc00000,
+            0xffe0ffff,
+            0xffffffff,
+            0xfc000000,
+            0xffe0ffff,
+            0xff00001f,
+            0xffc00000,
+            0xffe0ffff,
+            0xffffffff,
+            0xfc000000,
+            0xffe0ffff,
+            0xff00001f
+        };
+        xnu_pf_maskmatch(patchset, "filter_mismatch", mismatch_matches, mismatch_masks, sizeof(mismatch_masks) / sizeof(uint64_t), true, (void *)kpf_filter_mismatch_callback);
+
+    }
+
+
     if (protobox_used) {
+        // Protobox on is an additional sandbox mechanism in iOS 16+ that introduces syscall masks, which is used to have syscall whitelists on some system processes
+        // When injecting into them or using something like Frida, it can prevent certain functionality
+        // Additionally it makes these processes crash on sandbox violations, meaning that calling even something simple like mach_thread_self in watchdogd will crash the process
+        // We disable it by making the code that enables it think the device is in Restore mode, as this check involves calling is_release_type with a string it's easy to find
+        // /x 0000009000000091000000940000003700000090000000910000009400000036:1f00009fff0380ff000000fc1f0000ff1f00009fff0380ff000000fc1f0000fe
         uint64_t protobox_matches[] = {
             0x90000000, // adrp x0, "Restore"@PAGE
             0x91000000, // add x0, "Restore"@PAGEOFF
@@ -2465,13 +2601,21 @@ static void kpf_cmd(const char *cmd, char *args)
     xnu_pf_range_t* protobox_string_range = xnu_pf_section(sandbox_header, "__TEXT", "__cstring");
     if (!protobox_string_range) protobox_string_range = text_cstring_range;
 
-    const char protobox_string[] = "(apply-protobox)";
-    const char *protobox_string_match = memmem(protobox_string_range->cacheable_base, protobox_string_range->size, protobox_string, sizeof(protobox_string) - 1);
+    const char protobox_string[] = "failed to initialize protobox collection";
+    const char *protobox_string_match = memmem(protobox_string_range->cacheable_base, protobox_string_range->size, protobox_string, sizeof(protobox_string)-1);
+
+    const char autobox_string[] = "failed to initialize autobox collection";
+    const char* autobox_string_match = memmem(protobox_string_range->cacheable_base, protobox_string_range->size, autobox_string, sizeof(autobox_string)-1);
 
 #ifdef DEV_BUILD
     // 15.0 beta 3 and later, except bridgeOS
-    if ((gKernelVersion.xnuMajor >= 8019 && (xnu_platform() != PLATFORM_BRIDGEOS)) != (protobox_string_match != NULL)) {
+    if ((gKernelVersion.xnuMajor >= 8019 && (gKernelVersion.xnuMajor <= 10063) && (xnu_platform() != PLATFORM_BRIDGEOS)) != (protobox_string_match != NULL)) {
         panic("Protobox string doesn't match expected Darwin version");
+    }
+
+    // 18.0 beta 1 and later, except bridgeOS
+    if ((gKernelVersion.xnuMajor >= 11215) != (autobox_string_match != NULL) && (xnu_platform() != PLATFORM_BRIDGEOS)) {
+        panic("Autobox string doesn't match expected Darwin version");
     }
 #endif
 
@@ -2479,7 +2623,7 @@ static void kpf_cmd(const char *cmd, char *args)
     const char constraints_string[] = "mac_proc_check_launch_constraints";
     const char *constraints_string_match = memmem(text_cstring_range->cacheable_base, text_cstring_range->size, constraints_string, sizeof(constraints_string));
 
-    kpf_sandbox_kext_patches(sandbox_patchset, (protobox_string_match != NULL) && (constraints_string_match != NULL));
+    kpf_sandbox_kext_patches(sandbox_patchset, (protobox_string_match != NULL && gKernelVersion.darwinMajor >= 8792 && autobox_string_match == NULL), autobox_string_match != NULL);
     xnu_pf_emit(sandbox_patchset);
     xnu_pf_apply(sandbox_text_exec_range, sandbox_patchset);
     xnu_pf_patchset_destroy(sandbox_patchset);
@@ -2563,7 +2707,6 @@ static void kpf_cmd(const char *cmd, char *args)
     if (!found_vm_map_protect) panic("Missing patch: vm_map_protect");
     if (!vfs_context_current) panic("Missing patch: vfs_context_current");
     if (!kpf_has_done_mac_mount) panic("Missing patch: mac_mount");
-
 
     if (!has_found_apfs_vfsop_mount && apfs_vfsop_mount_string_match != NULL) {
       if (palera1n_flags & palerain_option_rootful) {
@@ -2688,6 +2831,10 @@ static void kpf_cmd(const char *cmd, char *args)
         delta &= 0x03ffffff;
         delta |= 0x94000000;
         *mac_execve_hook = delta;
+    }
+
+    if (autobox_string_match != NULL) {
+        *repatch_one_area_ptr = xnu_ptr_to_va(one_area - shellcode_from + shellcode_to);
     }
     
     if(!livefs_string_match) // Only disable snapshot when we can remount realfs

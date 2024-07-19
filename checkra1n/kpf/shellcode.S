@@ -433,7 +433,9 @@ _nvram_shc:
     ret
 _nvram_shc_end:
 
-
+.globl _one_area
+_one_area:
+.balign 0x100, 0xff
 
 .globl _kdi_shc
 .globl _kdi_shc_orig
