@@ -1828,36 +1828,6 @@ void kpf_sandbox_kext_patches(xnu_pf_patchset_t* patchset, bool protobox_used) {
 
         xnu_pf_maskmatch(patchset, "protobox", protobox_matches, protobox_masks, sizeof(protobox_masks) / sizeof(uint64_t), true, (void *)kpf_protobox_callback);
     }
-
-
-    /*if (protobox_used) {
-        // Protobox on is an additional sandbox mechanism in iOS 16+ that introduces syscall masks, which is used to have syscall whitelists on some system processes
-        // When injecting into them or using something like Frida, it can prevent certain functionality
-        // Additionally it makes these processes crash on sandbox violations, meaning that calling even something simple like mach_thread_self in watchdogd will crash the process
-        // We disable it by making the code that enables it think the device is in Restore mode, as this check involves calling is_release_type with a string it's easy to find
-        // /x 0000009000000091000000940000003700000090000000910000009400000036:1f00009fff0380ff000000fc1f0000ff1f00009fff0380ff000000fc1f0000fe
-        uint64_t protobox_matches[] = {
-            0x90000000, // adrp x0, "Restore"@PAGE
-            0x91000000, // add x0, "Restore"@PAGEOFF
-            0x94000000, // bl _is_release_type
-            0x37000000, // tbnz w0, #0, ???
-            0x90000000, // adrp x0, "Darwin"@PAGE
-            0x91000000, // add x0, "Darwin"@PAGEOFF
-            0x94000000, // bl _is_release_type
-            0x36000000, // tb(n)z w0, #0, ???
-        };
-        uint64_t protobox_masks[] = {
-            0x9f00001f,
-            0xff8003ff,
-            0xfc000000,
-            0xff00001f,
-            0x9f00001f,
-            0xff8003ff,
-            0xfc000000,
-            0xfe00001f,
-        };
-        xnu_pf_maskmatch(patchset, "protobox", protobox_matches, protobox_masks, sizeof(protobox_masks)/sizeof(uint64_t), true, (void *)kpf_protobox_callback);
-    }*/
 }
 
 bool vnop_rootvp_auth_callback(struct xnu_pf_patch *patch, uint32_t *opcode_stream) {
