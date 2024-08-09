@@ -2235,6 +2235,36 @@ static void kpf_find_shellcode_area(xnu_pf_patchset_t *xnu_text_exec_patchset)
     xnu_pf_maskmatch(xnu_text_exec_patchset, "shellcode_area", matches, masks, count, true, (void*)kpf_find_shellcode_area_callback);
 }
 
+bool kpf_img4_callback(struct xnu_pf_patch* patch, uint32_t* opcode_stream){
+    uint32_t* cbz = find_prev_insn(opcode_stream, 0x10, 0x340000e0, 0xFFFFFFFF);
+    uint32_t* bne = find_next_insn(opcode_stream, 0x20, 0x34000320, 0xFFFFFFFF);
+    
+    if(cbz && bne){
+        puts("KPF: found img4");
+        *cbz = 0x14000007;
+        *bne = 0x14000019;
+        return true;
+    }
+
+    return false;
+}
+
+
+void kpf_img4_patch(xnu_pf_patchset_t* xnu_text_exec_patchset) {
+    uint64_t matches[] = {
+        0xf9403be0,
+        0x9400129a,
+        0x34000320,
+    };
+    uint64_t masks[] = {
+        0xffffffff,
+        0xffffffff,
+        0xffffffff,
+    };
+
+    xnu_pf_maskmatch(xnu_text_exec_patchset, "img4", matches, masks, sizeof(matches)/sizeof(uint64_t), false, (void*)kpf_img4_callback);
+}
+
 static kpf_component_t kpf_shellcode =
 {
     .patches =
@@ -2605,6 +2635,15 @@ static void kpf_cmd(const char *cmd, char *args)
     xnu_pf_emit(xnu_text_exec_patchset);
     xnu_pf_apply(text_exec_range, xnu_text_exec_patchset);
     xnu_pf_patchset_destroy(xnu_text_exec_patchset);
+
+
+    xnu_pf_patchset_t* xnu_text_exec_patchset_img4 = xnu_pf_patchset_create(XNU_PF_ACCESS_32BIT);
+    struct mach_header_64* img4_header = xnu_pf_get_kext_header(hdr, "com.apple.security.AppleImage4");
+    xnu_pf_range_t* img4_text_range = xnu_pf_section(img4_header, "__TEXT_EXEC", "__text");
+    kpf_img4_patch(xnu_text_exec_patchset_img4);
+    xnu_pf_emit(xnu_text_exec_patchset_img4);
+    xnu_pf_apply(img4_text_range, xnu_text_exec_patchset_img4);
+    xnu_pf_patchset_destroy(xnu_text_exec_patchset_img4);
 
     if (!found_amfi_mac_syscall) panic("no amfi_mac_syscall");
     if (!dounmount_found) panic("no dounmount");
