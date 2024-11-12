@@ -1617,7 +1617,10 @@ static void kpf_cmd(const char *cmd, char *args)
 #ifdef DEV_BUILD
 #if 0
     // 15.0 beta 1 onwards, but only iOS/iPadOS
-    if((livefs_string_match != NULL) != (gKernelVersion.darwinMajor >= 21 && xnu_platform() == PLATFORM_IOS)) panic("livefs panic doesn't match expected Darwin version");
+    if((livefs_string_match != NULL) != (
+        (gKernelVersion.darwinMajor >= 21 && xnu_platform() == PLATFORM_IOS) ||
+        (gKernelVersion.darwinMajor >= 24 &&  gKernelVersion.darwinMinor >= 2 && xnu_platform() == PLATFORM_TVOS)))
+            panic("livefs panic doesn't match expected Darwin version");
 #endif
 #endif
 
