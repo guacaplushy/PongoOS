@@ -507,7 +507,7 @@ static void kpf_vm_map_protect_patch(xnu_pf_patchset_t* xnu_text_exec_patchset)
     // /x 00061f121f180071010000540000a837:10feffff1ffeffff1f0000ff1000f8ff
     // /x e003302a1f041f72010000540000a837:f0fff0ff1ffeffff1f0000ff1000e8ff
     // /x e003302a1f041f720100005400000035:f0fff0ff1ffeffff1f0000ff100000ff
-    // /x 1f00306a010000540000a837:1ffef0ff1f0000ff1000e8ff
+    // /x 1f00306a010000540000a837:1ffcf0ff1f0000ff1000e8ff
     // /x e003302a00041f12:f0fff0ff10feffff
     uint64_t matches_old[] = {
         0x121f0600, // and w{0-15}, w{16-31}, 6
@@ -542,12 +542,12 @@ static void kpf_vm_map_protect_patch(xnu_pf_patchset_t* xnu_text_exec_patchset)
     xnu_pf_maskmatch(xnu_text_exec_patchset, "vm_map_protect", matches_new, masks_new, sizeof(matches_new)/sizeof(uint64_t), false, (void*)kpf_vm_map_protect_branch_long);
 
     uint64_t matches17[] = {
-        0x6a30001f, // bics wzr, w{0-15}, w{16-31}
+        0x6a30001f, // bics wzr, wN, w{16-31}
         0x54000001, // b.ne 0x...
         0x37a80000, // tbnz w{0-15}, {0x15 | 0x17}, 0x...
     };
     uint64_t masks17[] = {
-        0xfff0fe1f,
+        0xfff0fc1f,
         0xff00001f,
         0xffe80010,
     };
