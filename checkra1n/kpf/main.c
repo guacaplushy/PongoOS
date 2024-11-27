@@ -2854,6 +2854,11 @@ static void palera1n_flags_cmd(const char *cmd, char *args)
     set_flags(args, &palera1n_flags, "palera1n_flags");
 }
 
+static inline void write64(uint64_t addr, uint64_t val)
+{
+    *(volatile uint64_t *)addr = val;
+}
+
 void module_entry(void)
 {
     puts("");
@@ -2886,6 +2891,15 @@ void module_entry(void)
         {
             component->pre_init();
         }
+    }
+
+    if (socnum == 0x8010 || socnum == 0x8012) {
+        write64(0x202f80000 + 0x0 + 10 * 0x20, 0xb800000404a20c80);
+        write64(0x202f80000 + 0x8 + 10 * 0x20, 0x66002fc68d000000);
+        write64(0x202f80000 + 0x10 + 10 * 0x20, 0x4800);
+        write64(0x202f80000 + 0x0 + 11 * 0x20, 0xb800000404a20c80);
+        write64(0x202f80000 + 0x8 + 11 * 0x20, 0x66002fc68d000000);
+        write64(0x202f80000 + 0x10 + 11 * 0x20, 0x4800);
     }
 
     preboot_hook = kpf_cmd;
