@@ -2917,10 +2917,11 @@ void module_entry(void)
         printf("status=0x%x\n", read32(0x202f20050));
     } else if (socnum == 0x8003) {
         // tell the kernel our configuration
-        ((uint32_t*)dt_prop(dt_find(gDeviceTree, "/arm-io/pmgr"), "voltage-states1", NULL))[12] = 0x6aaa; // 2400 MHz
+        ((uint32_t*)dt_prop(dt_find(gDeviceTree, "/arm-io/pmgr"), "voltage-states1", NULL))[12] = 0x6893; // 2448 MHz
         ((uint32_t*)dt_prop(dt_find(gDeviceTree, "/arm-io/pmgr"), "voltage-states1", NULL))[13] = 0x3e8; // 1000 mV
         // actually overclock
-        write64(0x202220068 + 0x300, 0xb000000007202640); // volt = (450 + ((((bit[63:56]) * 3125)) / 1000))
+        //write64(0x202220068 + 0x300, 0xb000000007202640); // volt = (450 + ((((bit[63:56]) * 3125)) / 1000))
+        write64(0x202220068 + 0x300, 0xb000000007202660); // volt = (450 + ((((bit[63:56]) * 3125)) / 1000))
         write64(0x202220868 + (8 * 8), 0x55000f800d000000);
     }
 
