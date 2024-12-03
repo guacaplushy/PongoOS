@@ -2859,8 +2859,19 @@ static inline void write64(uint64_t addr, uint64_t val)
     *(volatile uint64_t *)addr = val;
 }
 
+static inline void write32(uint64_t addr, uint32_t val)
+{
+    *(volatile uint32_t *)addr = val;
+}
+
+static inline uint32_t read32(uint64_t addr)
+{
+    return *(volatile uint32_t *)addr;
+}
+
 void module_entry(void)
 {
+    *(uint32_t*)dt_prop(dt_find(gDeviceTree, "/chosen"), "debug-enabled", NULL) = 1;
     puts("");
     puts("");
     puts("#==================");
@@ -2894,12 +2905,23 @@ void module_entry(void)
     }
 
     if (socnum == 0x8010 || socnum == 0x8012) {
+        write32(0x20e0a0000, 1);
         write64(0x202f80000 + 0x0 + 10 * 0x20, 0xb800000404a20c80);
         write64(0x202f80000 + 0x8 + 10 * 0x20, 0x66002fc68d000000);
         write64(0x202f80000 + 0x10 + 10 * 0x20, 0x4800);
         write64(0x202f80000 + 0x0 + 11 * 0x20, 0xb800000404a20c80);
         write64(0x202f80000 + 0x8 + 11 * 0x20, 0x66002fc68d000000);
         write64(0x202f80000 + 0x10 + 11 * 0x20, 0x4800);
+        write64(0x202f20020, 1 << 25 | 11 | 11 << 12);
+        usleep(500);
+        printf("status=0x%x\n", read32(0x202f20050));
+    } else if (socnum == 0x8003) {
+        // tell the kernel our configuration
+        ((uint32_t*)dt_prop(dt_find(gDeviceTree, "/arm-io/pmgr"), "voltage-states1", NULL))[12] = 0x6aaa; // 2400 MHz
+        ((uint32_t*)dt_prop(dt_find(gDeviceTree, "/arm-io/pmgr"), "voltage-states1", NULL))[13] = 0x3e8; // 1000 mV
+        // actually overclock
+        write64(0x202220068 + 0x300, 0xb000000007202640); // volt = (450 + ((((bit[63:56]) * 3125)) / 1000))
+        write64(0x202220868 + (8 * 8), 0x55000f800d000000);
     }
 
     preboot_hook = kpf_cmd;
