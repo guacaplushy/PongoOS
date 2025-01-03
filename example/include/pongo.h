@@ -33,6 +33,7 @@
 #define DT_KEY_LEN 0x20
 #define BOOT_LINE_LENGTH_iOS12 0x100
 #define BOOT_LINE_LENGTH_iOS13 0x260
+#define BOOT_LINE_LENGTH_iOS18 0x400
 
 struct Boot_Video {
 	unsigned long	v_baseAddr;	/* Base address of video memory */
@@ -69,6 +70,12 @@ typedef struct boot_args {
 			uint64_t		bootFlags;		/* Additional flags specified by the bootloader */
 			uint64_t		memSizeActual;		/* Actual size of memory */
 		} iOS13;
+		struct {
+			char			CommandLine[BOOT_LINE_LENGTH_iOS18];	/* Passed in command line */
+			uint32_t		__pad;
+			uint64_t		bootFlags;		/* Additional flags specified by the bootloader */
+			uint64_t		memSizeActual;		/* Actual size of memory */
+		} iOS18;
 	};
 } __attribute__((packed)) boot_args;
 

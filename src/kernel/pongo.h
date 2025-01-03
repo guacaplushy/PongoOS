@@ -61,6 +61,7 @@
 
 #define BOOT_LINE_LENGTH_iOS12 0x100
 #define BOOT_LINE_LENGTH_iOS13 0x260
+#define BOOT_LINE_LENGTH_iOS18 0x400
 
 extern int service_cmd(const char* name, int cmd_id, void* data_in, size_t in_size, void* data_out, size_t* out_size);
 
@@ -106,6 +107,12 @@ typedef struct boot_args {
 			uint64_t		bootFlags;		/* Additional flags specified by the bootloader */
 			uint64_t		memSizeActual;		/* Actual size of memory */
 		} iOS13;
+		struct {
+			char			CommandLine[BOOT_LINE_LENGTH_iOS18];	/* Passed in command line */
+			uint32_t		__pad;
+			uint64_t		bootFlags;		/* Additional flags specified by the bootloader */
+			uint64_t		memSizeActual;		/* Actual size of memory */
+		} iOS18;
 	};
 } __attribute__((packed)) boot_args;
 
